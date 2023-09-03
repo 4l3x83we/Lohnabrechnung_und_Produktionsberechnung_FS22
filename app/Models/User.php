@@ -3,7 +3,12 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Admin\Project;
+use App\Models\Admin\Team;
+use App\Models\Maps\Maps;
+use App\Models\Production\ProductionToMap;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -21,6 +26,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'current_team_id',
+        'current_project_id',
     ];
 
     /**
@@ -42,4 +49,74 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class)->withPivot('is_owner');
+    }
+
+    public function projectName()
+    {
+        if (auth()->user()->current_project_id) {
+            return Project::findOrFail(auth()->user()->current_project_id)->project_name;
+        }
+    }
+
+    public function projectMapID()
+    {
+        if (auth()->user()->current_project_id) {
+            return Project::findOrFail(auth()->user()->current_project_id)->project_map;
+        }
+
+        return null;
+    }
+
+    public function teamName()
+    {
+        return Team::findOrFail(auth()->user()->current_team_id)->name;
+    }
+
+    public function teamImage()
+    {
+        return Team::findOrFail(auth()->user()->current_team_id)->image;
+    }
+
+    public function projectImage()
+    {
+        if (auth()->user()->current_project_id) {
+            return Project::findOrFail(auth()->user()->current_project_id)->project_image;
+        }
+
+        return null;
+    }
+
+    public function productionChoose()
+    {
+        if (auth()->user()->current_project_id) {
+            return ProductionToMap::where('project_id', '=', auth()->user()->current_project_id)->first();
+        }
+
+        return null;
+    }
+
+    public function mapAuswahl()
+    {
+        $map = null;
+        $fields = null;
+        $projectMap = Project::where('team_id', auth()->user()->current_team_id)->first()->project_map;
+        if ($projectMap) {
+            $maps = Maps::find($projectMap);
+            if (lang() === 'de') {
+                $map = $maps->md_title_de;
+            } else {
+                $map = $maps->md_title_en;
+            }
+            $fields = count(json_decode($maps->md_fields, true));
+        }
+
+        return [
+            'maps' => $map,
+            'fields' => $fields,
+        ];
+    }
 }
